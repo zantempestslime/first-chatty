@@ -13,7 +13,7 @@ let isInitiator = false;
 let connectionStarted = false;
 
 const configuration = {
-  iceTransportPolicy: "relay", // Force TURN only
+  iceTransportPolicy: "relay", // Force TURN for testing
   iceServers: [
     {
       urls: "turn:standard.relay.metered.ca:80",
@@ -38,10 +38,17 @@ const configuration = {
   ]
 };
 
-socket.on('connect', () => {
-  console.log("Connected to signaling server. ID:", socket.id);
-  socket.emit('join', 'casual-chat');
-});
+// Helper to show status on screen
+function showStatus(text) {
+  const p = document.createElement('p');
+  p.textContent = "🔧 " + text;
+  p.style.color = "#555";
+  p.style.fontSize = "13px";
+  p.style.margin = "4px 0";
+  text_area.appendChild(p);
+  text_area.scrollTop = text_area.scrollHeight;
+  console.log(text); // still log to console if available
+}
 
 function appendMessageToUI(text, senderType) {
   const p = document.createElement('p');
@@ -51,11 +58,16 @@ function appendMessageToUI(text, senderType) {
   text_area.scrollTop = text_area.scrollHeight;
 }
 
+socket.on('connect', () => {
+  showStatus("Connected to signaling server. ID: " + socket.id);
+  socket.emit('join', 'casual-chat');
+});
+
 function setupDataChannel(channel) {
   dataChannel = channel;
 
   dataChannel.onopen = () => {
-    console.log("✅ Data channel is OPEN");
+    showStatus("✅ Data channel is OPEN - you can chat now!");
     appendMessageToUI("--- Direct WebRTC Connection Established ---", "system");
   };
 
@@ -63,19 +75,19 @@ function setupDataChannel(channel) {
     appendMessageToUI(e.data, "peer");
   };
 
-  dataChannel.onclose = () => console.log("Data channel closed");
-  dataChannel.onerror = (err) => console.error("DataChannel error:", err);
+  dataChannel.onclose = () => showStatus("Data channel closed");
+  dataChannel.onerror = (err) => showStatus("DataChannel error: " + err);
 }
 
 function createPeerConnection() {
   peerConnection = new RTCPeerConnection(configuration);
 
   peerConnection.oniceconnectionstatechange = () => {
-    console.log("ICE state →", peerConnection.iceConnectionState);
+    showStatus("ICE state → " + peerConnection.iceConnectionState);
   };
 
   peerConnection.onconnectionstatechange = () => {
-    console.log("Connection state →", peerConnection.connectionState);
+    showStatus("Connection state → " + peerConnection.connectionState);
   };
 
   peerConnection.onicecandidate = (event) => {
@@ -88,50 +100,48 @@ function createPeerConnection() {
   };
 
   peerConnection.ondatachannel = (event) => {
-    console.log("Received data channel");
+    showStatus("Received data channel from other peer");
     setupDataChannel(event.channel);
   };
 }
 
 async function startConnection() {
   if (connectionStarted || peerConnection) {
-    console.log("Connection already started");
+    showStatus("Connection already started");
     return;
   }
 
   connectionStarted = true;
   isInitiator = true;
+  showStatus("Starting as initiator...");
 
   try {
     createPeerConnection();
 
-    // Only the initiator creates the data channel
     const channel = peerConnection.createDataChannel("chat");
     setupDataChannel(channel);
 
     const offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
 
-    console.log("Sending offer...");
+    showStatus("Sending offer...");
     socket.emit('signal', {
       type: 'offer',
       offer: peerConnection.localDescription
     });
   } catch (err) {
-    console.error("Failed to start connection:", err);
+    showStatus("Failed to start: " + err.message);
     connectionStarted = false;
   }
 }
 
 socket.on('signal', async (data) => {
   try {
-    // ========== OFFER ==========
     if (data.type === 'offer') {
-      console.log("Received offer");
+      showStatus("Received offer");
 
-      // If we already started as initiator, ignore this offer
       if (isInitiator || connectionStarted) {
-        console.log("Ignoring offer because we are the initiator");
+        showStatus("Ignoring offer (we are initiator)");
         return;
       }
 
@@ -139,9 +149,8 @@ socket.on('signal', async (data) => {
       createPeerConnection();
 
       await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
-      console.log("Remote description set (offer)");
+      showStatus("Remote description set (offer)");
 
-      // Add any candidates that arrived early
       for (const c of pendingCandidates) {
         await peerConnection.addIceCandidate(c);
       }
@@ -150,37 +159,34 @@ socket.on('signal', async (data) => {
       const answer = await peerConnection.createAnswer();
       await peerConnection.setLocalDescription(answer);
 
-      console.log("Sending answer...");
+      showStatus("Sending answer...");
       socket.emit('signal', {
         type: 'answer',
         answer: peerConnection.localDescription
       });
     }
 
-    // ========== ANSWER ==========
     else if (data.type === 'answer') {
-      console.log("Received answer");
+      showStatus("Received answer");
 
       if (!peerConnection) {
-        console.log("No peerConnection yet, ignoring answer");
+        showStatus("No peerConnection yet, ignoring answer");
         return;
       }
 
-      // Only accept the answer if we are waiting for it
       if (peerConnection.signalingState === "have-local-offer") {
         await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-        console.log("Remote description set (answer)");
+        showStatus("Remote description set (answer)");
 
         for (const c of pendingCandidates) {
           await peerConnection.addIceCandidate(c);
         }
         pendingCandidates = [];
       } else {
-        console.log("Ignoring answer - current state is:", peerConnection.signalingState);
+        showStatus("Ignoring answer - state is: " + peerConnection.signalingState);
       }
     }
 
-    // ========== CANDIDATE ==========
     else if (data.type === 'candidate') {
       const candidate = new RTCIceCandidate(data.candidate);
 
@@ -191,16 +197,14 @@ socket.on('signal', async (data) => {
       }
     }
   } catch (err) {
-    console.error("Error while handling signal:", err);
+    showStatus("Error: " + err.message);
   }
 });
 
-// When user clicks the Send button
 send_btn.addEventListener('click', async () => {
   const text = text_input.value.trim();
   if (!text) return;
 
-  // Already connected → just send the message
   if (dataChannel && dataChannel.readyState === 'open') {
     dataChannel.send(text);
     appendMessageToUI(text, "you");
@@ -208,7 +212,6 @@ send_btn.addEventListener('click', async () => {
     return;
   }
 
-  // Not connected → start the connection
-  console.log("Trying to start connection...");
+  showStatus("Trying to start connection...");
   await startConnection();
 });
