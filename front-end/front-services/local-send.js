@@ -3,9 +3,11 @@ const text_input = document.getElementById('text-input');
 const text_area = document.getElementById('text-area');
 
 // 1. Establish background network connections to your live Render server
-const socket = io('https://onrender.com', {
-  transports: ['websocket'] // Forces stable websocket connections directly
+// Ensure this exact URL string is used:
+const socket = io('https://first-chatty.onrender.com', {
+  transports: ['websocket']
 });
+
 
 let peerConnection;
 let dataChannel;
