@@ -8,8 +8,9 @@ const socket = io('https://first-chatty.onrender.com', {
 
 let peerConnection = null;
 let dataChannel = null;
-let isInitiator = false;
-let pendingCandidates = []; // Important: queue candidates until remote description is set
+let pendingCandidates = [];
+let mySocketId = null;
+let isMakingOffer = false;
 
 const configuration = {
   iceServers: [
@@ -37,9 +38,9 @@ const configuration = {
   ]
 };
 
-// Join the room as soon as connected
 socket.on('connect', () => {
-  console.log("Connected to signaling server");
+  mySocketId = socket.id;
+  console.log("Connected to signaling server. My ID:", mySocketId);
   socket.emit('join', 'casual-chat');
 });
 
@@ -53,7 +54,7 @@ function appendMessageToUI(text, senderType) {
 
 function setupDataChannelEvents() {
   dataChannel.onopen = () => {
-    console.log("Data channel is open!");
+    console.log("✅ Data channel is OPEN");
     appendMessageToUI("--- Direct WebRTC Connection Established ---", "system");
   };
 
@@ -61,59 +62,78 @@ function setupDataChannelEvents() {
     appendMessageToUI(event.data, "peer");
   };
 
-  dataChannel.onclose = () => {
-    console.log("Data channel closed");
-  };
-
-  dataChannel.onerror = (err) => {
-    console.error("Data channel error:", err);
-  };
+  dataChannel.onclose = () => console.log("Data channel closed");
+  dataChannel.onerror = (err) => console.error("Data channel error:", err);
 }
 
 function createPeerConnection() {
   peerConnection = new RTCPeerConnection(configuration);
 
-  // Log connection states (very useful for debugging)
   peerConnection.oniceconnectionstatechange = () => {
-    console.log("ICE Connection State:", peerConnection.iceConnectionState);
+    console.log("ICE Connection State →", peerConnection.iceConnectionState);
   };
 
   peerConnection.onconnectionstatechange = () => {
-    console.log("Connection State:", peerConnection.connectionState);
+    console.log("Connection State →", peerConnection.connectionState);
   };
 
-  // Send ICE candidates to the other peer
   peerConnection.onicecandidate = (event) => {
     if (event.candidate) {
-      console.log("Sending ICE candidate");
       socket.emit('signal', { type: 'candidate', candidate: event.candidate });
     }
   };
 
-  // When we receive a data channel from the other side
   peerConnection.ondatachannel = (event) => {
-    console.log("Received data channel");
+    console.log("Received data channel from other peer");
     dataChannel = event.channel;
     setupDataChannelEvents();
   };
 }
 
+async function makeOffer() {
+  if (isMakingOffer || peerConnection) return;
+
+  try {
+    isMakingOffer = true;
+    createPeerConnection();
+
+    // Only the initiator creates the data channel
+    dataChannel = peerConnection.createDataChannel('chatChannel');
+    setupDataChannelEvents();
+
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+
+    console.log("Sending offer...");
+    socket.emit('signal', {
+      type: 'offer',
+      offer: peerConnection.localDescription
+    });
+  } catch (err) {
+    console.error("Error creating offer:", err);
+  } finally {
+    isMakingOffer = false;
+  }
+}
+
 async function handleOffer(offer) {
-  if (peerConnection) {
-    console.log("Already have a peer connection, ignoring new offer");
+  // If we are currently making an offer, ignore this one (glare protection)
+  if (isMakingOffer) {
+    console.log("Ignoring offer because we are currently making one");
     return;
   }
 
-  isInitiator = false;
-  createPeerConnection();
-
   try {
+    if (!peerConnection) {
+      createPeerConnection();
+    }
+
     await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
     console.log("Remote description set (offer)");
 
-    // Add any candidates that arrived early
-    for (const candidate of pendingCandidates) {
-      await peerConnection.addIceCandidate(candidate);
+    // Add queued candidates
+    for (const c of pendingCandidates) {
+      await peerConnection.addIceCandidate(c);
     }
     pendingCandidates = [];
 
@@ -131,12 +151,13 @@ async function handleOffer(offer) {
 
 async function handleAnswer(answer) {
   try {
+    if (!peerConnection) return;
+
     await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
     console.log("Remote description set (answer)");
 
-    // Add any candidates that arrived early
-    for (const candidate of pendingCandidates) {
-      await peerConnection.addIceCandidate(candidate);
+    for (const c of pendingCandidates) {
+      await peerConnection.addIceCandidate(c);
     }
     pendingCandidates = [];
   } catch (err) {
@@ -151,7 +172,6 @@ async function handleCandidate(candidate) {
     if (peerConnection && peerConnection.remoteDescription) {
       await peerConnection.addIceCandidate(iceCandidate);
     } else {
-      // Queue it until remote description is ready
       pendingCandidates.push(iceCandidate);
     }
   } catch (err) {
@@ -159,7 +179,6 @@ async function handleCandidate(candidate) {
   }
 }
 
-// Listen for signals from the other peer
 socket.on('signal', async (data) => {
   console.log("Received signal:", data.type);
 
@@ -175,9 +194,9 @@ socket.on('signal', async (data) => {
 // When user clicks Send
 send_btn.addEventListener('click', async () => {
   const textValue = text_input.value.trim();
-  if (textValue === '') return;
+  if (!textValue) return;
 
-  // If connection is already open → just send the message
+  // Already connected → just send
   if (dataChannel && dataChannel.readyState === 'open') {
     dataChannel.send(textValue);
     appendMessageToUI(textValue, "you");
@@ -185,28 +204,7 @@ send_btn.addEventListener('click', async () => {
     return;
   }
 
-  // Otherwise start the connection (become the initiator)
-  if (!peerConnection) {
-    console.log("Starting WebRTC as initiator...");
-    isInitiator = true;
-    createPeerConnection();
-
-    // Create the data channel
-    dataChannel = peerConnection.createDataChannel('chatChannel');
-    setupDataChannelEvents();
-
-    try {
-      const offer = await peerConnection.createOffer();
-      await peerConnection.setLocalDescription(offer);
-
-      socket.emit('signal', {
-        type: 'offer',
-        offer: peerConnection.localDescription
-      });
-    } catch (err) {
-      console.error("Error creating offer:", err);
-    }
-  } else {
-    console.log("Still waiting for connection to open...");
-  }
+  // Not connected yet → start the connection
+  console.log("Trying to start connection...");
+  await makeOffer();
 });
