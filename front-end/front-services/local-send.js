@@ -3,11 +3,9 @@ const text_input = document.getElementById('text-input');
 const text_area = document.getElementById('text-area');
 
 // 1. Establish background network connections to your live Render server
-// Ensure this exact URL string is used:
-const socket = io('https://first-chatty.onrender.com', {
+const socket = io('https://onrender.com', {
   transports: ['websocket']
 });
-
 
 let peerConnection;
 let dataChannel;
@@ -22,15 +20,15 @@ socket.on('connect', () => {
 function appendMessageToUI(text, senderType) {
   const new_message = document.createElement('p');
   new_message.textContent = text;
-  new_message.classList.add('message', senderType); // Adds sender class for CSS styling
+  new_message.classList.add('message', senderType);
   text_area.appendChild(new_message);
-  text_area.scrollTop = text_area.scrollHeight; // Auto scrolls down
+  text_area.scrollTop = text_area.scrollHeight;
 }
 
 function setupWebRTC(isInitiator) {
   peerConnection = new RTCPeerConnection(configuration);
 
-  // Swap network pathways ("business cards") via your Socket.io server
+  // Swap network pathways via your Socket.io server
   peerConnection.onicecandidate = (event) => {
     if (event.candidate) {
       socket.emit('signal', { type: 'candidate', candidate: event.candidate });
@@ -76,7 +74,6 @@ function setupDataChannelEvents() {
     appendMessageToUI("--- Direct WebRTC Connection Established ---", "system");
   };
   dataChannel.onmessage = (event) => {
-    // Run your layout code when a peer sends a message
     appendMessageToUI(event.data, "peer");
   };
 }
@@ -89,12 +86,10 @@ send_btn.addEventListener('click', () => {
   // Send across the WebRTC P2P direct network data pipeline
   if (dataChannel && dataChannel.readyState === 'open') {
     dataChannel.send(textValue);
-    // Render it locally on your own screen using your tag layout logic
     appendMessageToUI(textValue, "you");
     text_input.value = '';
   } else {
     console.log("Waiting for another tab to join the room...");
-    // Fallback: If WebRTC isn't ready yet, act as the room creator
     setupWebRTC(true);
   }
 });
