@@ -1,8 +1,12 @@
 {
-  "name": "rtc-backend",
+  "name": "first-chatty-backend",
   "version": "1.0.0",
-  "main": "server.js",
+  "main": "signaling/socket.js",
+  "scripts": {
+    "start": "node signaling/socket.js"
+  },
   "dependencies": {
-    "ws": "^8.21.1"
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
   }
 }
