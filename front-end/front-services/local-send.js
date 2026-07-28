@@ -9,7 +9,11 @@ const socket = io('https://first-chatty.onrender.com', {
 
 let peerConnection;
 let dataChannel;
-const configuration = { iceServers: [{ urls: 'stun:://google.com' }] };
+
+// Fixed: valid STUN server URI (was 'stun:://google.com')
+const configuration = {
+  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+};
 
 // Automatically join a universal room named "casual-chat" on page load
 socket.on('connect', () => {
@@ -39,7 +43,7 @@ function setupWebRTC(isInitiator) {
     // Setup direct serverless pathway
     dataChannel = peerConnection.createDataChannel('chatChannel');
     setupDataChannelEvents();
-    
+
     peerConnection.createOffer()
       .then(offer => peerConnection.setLocalDescription(offer))
       .then(() => {
