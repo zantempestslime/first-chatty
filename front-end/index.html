@@ -5,7 +5,7 @@
     <title>First Chat</title>
     <link rel="stylesheet" href="styling/basic-design.css">
     
-    <!-- FIX 1: Use the correct, official CDN link for the Socket.io client library -->
+    <!-- Official CDN link for the Socket.io client library -->
     <script src="https://socket.io"></script>
 </head>
 <body>
@@ -17,7 +17,7 @@
         <button id="send-btn">Send</button>
     </div>
 
-    <!-- FIX 2: Removed the nested '/front-end' prefix so it maps perfectly on Render -->
-    <script src="/front-services/local-send.js"></script>
+    <!-- Added 'defer' attribute to enforce correct execution order -->
+    <script src="/front-services/local-send.js" defer></script>
 </body>
 </html>
