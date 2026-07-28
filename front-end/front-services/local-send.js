@@ -3,7 +3,7 @@ const text_input = document.getElementById('text-input');
 const text_area = document.getElementById('text-area');
 
 // 1. Establish background network connections to your live Render server
-const socket = io('https://onrender.com', {
+const socket = io('https://first-chatty.onrender.com', {
   transports: ['websocket']
 });
 
