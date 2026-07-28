@@ -13,9 +13,8 @@ let isInitiator = false;
 let connectionStarted = false;
 
 const configuration = {
-  iceTransportPolicy: "relay", // Force TURN only (for testing)
+  iceTransportPolicy: "relay", // Force TURN only
   iceServers: [
-    { urls: "stun:stun.relay.metered.ca:80" },
     {
       urls: "turn:standard.relay.metered.ca:80",
       username: "95e33d67d86cedc472faf8ef",
