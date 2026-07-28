@@ -1,0 +1,12 @@
+{
+{
+  "name": "rtc-backend",
+  "version": "1.0.0",
+  "main": "signaling/socket.js",
+  "scripts": {
+    "start": "node signaling/socket.js"
+  },
+  "dependencies": {
+    "ws": "^8.21.1"
+  }
+}
