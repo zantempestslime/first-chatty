@@ -13,26 +13,26 @@ let isInitiator = false;
 let connectionStarted = false;
 
 const configuration = {
-  iceTransportPolicy: "relay",   // ← Force only TURN (no direct connection)
+  iceTransportPolicy: "relay", // Force TURN only (for testing)
   iceServers: [
     { urls: "stun:stun.relay.metered.ca:80" },
     {
-      urls: "turn:global.relay.metered.ca:80",
+      urls: "turn:standard.relay.metered.ca:80",
       username: "95e33d67d86cedc472faf8ef",
       credential: "8XwF3aZRR1yMQF1j",
     },
     {
-      urls: "turn:global.relay.metered.ca:80?transport=tcp",
+      urls: "turn:standard.relay.metered.ca:80?transport=tcp",
       username: "95e33d67d86cedc472faf8ef",
       credential: "8XwF3aZRR1yMQF1j",
     },
     {
-      urls: "turn:global.relay.metered.ca:443",
+      urls: "turn:standard.relay.metered.ca:443",
       username: "95e33d67d86cedc472faf8ef",
       credential: "8XwF3aZRR1yMQF1j",
     },
     {
-      urls: "turns:global.relay.metered.ca:443?transport=tcp",
+      urls: "turns:standard.relay.metered.ca:443?transport=tcp",
       username: "95e33d67d86cedc472faf8ef",
       credential: "8XwF3aZRR1yMQF1j",
     },
