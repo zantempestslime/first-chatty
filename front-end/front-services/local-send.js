@@ -13,6 +13,7 @@ let isInitiator = false;
 let connectionStarted = false;
 
 const configuration = {
+  iceTransportPolicy: "relay",   // ← Force only TURN (no direct connection)
   iceServers: [
     { urls: "stun:stun.relay.metered.ca:80" },
     {
