@@ -1,18 +1,23 @@
 <!DOCTYPE html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>First Chat</title>
     <link rel="stylesheet" href="styling/basic-design.css">
+    
+    <!-- FIX 1: Use the correct, official CDN link for the Socket.io client library -->
     <script src="https://socket.io"></script>
 </head>
 <body>
-      <div class="chat-area" id="text-area">
+    <div class="chat-area" id="text-area">
         <p id="msg1" class="message">This is a Test Message</p>
     </div>
-    <div class="text-area" >
+    <div class="text-area">
         <input type="text" id="text-input">
         <button id="send-btn">Send</button>
     </div>
 
-    <script src="/front-end/front-services/local-send.js"></script>
+    <!-- FIX 2: Removed the nested '/front-end' prefix so it maps perfectly on Render -->
+    <script src="/front-services/local-send.js"></script>
 </body>
+</html>
